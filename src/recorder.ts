@@ -1,9 +1,12 @@
 import {
   BufferTarget,
   CanvasSource,
+  MediaStreamAudioTrackSource,
   Mp4OutputFormat,
   Output,
+  canEncodeAudio,
   canEncodeVideo,
+  getFirstEncodableAudioCodec,
   getFirstEncodableVideoCodec
 } from "mediabunny";
 
@@ -14,6 +17,15 @@ type RecorderEvents = {
   onPreviewReady: (previewUrl: string | null) => void;
   onDownloadReady: (downloadReady: boolean) => void;
   onDiagnosticsChange: (diagnostics: RecorderDiagnostics) => void;
+  renderFrame: (frame: RenderFrameRequest) => void;
+  setPreviewPlaybackEnabled: (enabled: boolean) => void;
+};
+
+export type RenderFrameRequest = {
+  mode: "deterministic" | "fixed-delta";
+  timestampSeconds: number;
+  deltaSeconds: number;
+  frameIndex: number;
 };
 
 export type RecorderDiagnostics = {
@@ -24,14 +36,19 @@ export type RecorderDiagnostics = {
 };
 
 type StartRecordingOptions = {
-  mode: "realtime";
+  mode: "realtime" | "deterministic" | "fixed-delta";
   frameRate: number;
   bitrate: number;
+  durationSeconds?: number;
+  fixedDeltaMs?: number;
+  audioTrack?: MediaStreamTrack | null;
 };
 
 type ActiveRecording = {
+  mode: "realtime" | "deterministic" | "fixed-delta";
   output: Output<Mp4OutputFormat, BufferTarget>;
   source: CanvasSource;
+  audioSource: MediaStreamAudioTrackSource | null;
   loopPromise: Promise<void> | null;
   startedAt: number;
   frameDuration: number;
@@ -40,6 +57,7 @@ type ActiveRecording = {
   finalizePromise: Promise<void> | null;
   codec: string;
   sleepResolver: (() => void) | null;
+  durationSeconds: number | null;
 };
 
 export class BabylonSceneRecorder {
@@ -59,6 +77,22 @@ export class BabylonSceneRecorder {
       throw new Error("Recording is already active.");
     }
 
+    if (options.mode === "deterministic") {
+      if (!Number.isFinite(options.durationSeconds) || (options.durationSeconds ?? 0) <= 0) {
+        throw new Error("Deterministic export requires a duration greater than 0 seconds.");
+      }
+    }
+
+    if (options.mode === "fixed-delta") {
+      if (!Number.isFinite(options.durationSeconds) || (options.durationSeconds ?? 0) <= 0) {
+        throw new Error("Fixed Delta export requires a duration greater than 0 seconds.");
+      }
+
+      if (!Number.isFinite(options.fixedDeltaMs) || (options.fixedDeltaMs ?? 0) <= 0) {
+        throw new Error("Fixed Delta export requires a fixed delta greater than 0 ms.");
+      }
+    }
+
     const codec = await this.getPreferredCodec(options);
     const target = new BufferTarget();
     const output = new Output({
@@ -70,21 +104,41 @@ export class BabylonSceneRecorder {
       codec,
       bitrate: options.bitrate
     });
+    let audioSource: MediaStreamAudioTrackSource | null = null;
+
+    const outputFrameRate =
+      options.mode === "fixed-delta"
+        ? 1000 / (options.fixedDeltaMs ?? 16.6667)
+        : options.frameRate;
 
     output.addVideoTrack(source, {
-      frameRate: options.frameRate
+      frameRate: outputFrameRate
     });
+
+    if (options.mode === "realtime" && options.audioTrack) {
+      const audioCodec = await this.getPreferredAudioCodec(options.audioTrack);
+      audioSource = new MediaStreamAudioTrackSource(options.audioTrack as MediaStreamAudioTrack, {
+        codec: audioCodec,
+        bitrate: 128_000
+      });
+      output.addAudioTrack(audioSource);
+    }
 
     await output.start();
 
     this.clearPreview();
     this.clearDownload();
 
-    const frameDuration = 1 / options.frameRate;
+    const frameDuration =
+      options.mode === "fixed-delta"
+        ? (options.fixedDeltaMs ?? 16.6667) / 1000
+        : 1 / options.frameRate;
 
     this.activeRecording = {
+      mode: options.mode,
       output,
       source,
+      audioSource,
       loopPromise: null,
       startedAt: performance.now(),
       frameDuration,
@@ -92,7 +146,8 @@ export class BabylonSceneRecorder {
       paused: false,
       finalizePromise: null,
       codec,
-      sleepResolver: null
+      sleepResolver: null,
+      durationSeconds: options.mode === "realtime" ? null : options.durationSeconds ?? null
     };
 
     this.emitDiagnostics({
@@ -101,10 +156,23 @@ export class BabylonSceneRecorder {
       recordedSeconds: 0,
       fileSizeBytes: null
     });
-    this.startLoop();
 
     this.events.onRecordingChange(true);
     this.events.onPauseChange(false);
+
+    if (options.mode === "deterministic" || options.mode === "fixed-delta") {
+      this.events.setPreviewPlaybackEnabled(false);
+      this.events.onPauseChange(true);
+      this.events.onStatus(
+        options.mode === "deterministic"
+          ? `Exporting deterministic MP4 with ${codec.toUpperCase()} at ${options.frameRate} FPS for ${options.durationSeconds}s.`
+          : `Exporting fixed-delta MP4 with ${codec.toUpperCase()} at ${options.fixedDeltaMs} ms step (${outputFrameRate.toFixed(2)} FPS) for ${options.durationSeconds}s.`
+      );
+      this.startOfflineLoop();
+      return;
+    }
+
+    this.startLoop();
     this.events.onStatus(
       `Recording ${options.mode} MP4 with ${codec.toUpperCase()} at ${options.frameRate} FPS.`
     );
@@ -116,12 +184,17 @@ export class BabylonSceneRecorder {
       throw new Error("No recording is active.");
     }
 
+    if (active.mode === "deterministic") {
+      return;
+    }
+
     if (active.paused) {
       return;
     }
 
     this.stopLoop(active);
     active.paused = true;
+    active.audioSource?.pause();
     this.events.onPauseChange(true);
     this.events.onStatus("Recording paused.");
   }
@@ -132,11 +205,16 @@ export class BabylonSceneRecorder {
       throw new Error("No recording is active.");
     }
 
+    if (active.mode === "deterministic") {
+      return;
+    }
+
     if (!active.paused) {
       return;
     }
 
     active.paused = false;
+    active.audioSource?.resume();
     this.startLoop();
     this.events.onPauseChange(false);
     this.events.onStatus("Recording resumed.");
@@ -228,6 +306,60 @@ export class BabylonSceneRecorder {
     });
   }
 
+  private startOfflineLoop(): void {
+    const active = this.activeRecording;
+    if (!active || (active.mode !== "deterministic" && active.mode !== "fixed-delta") || active.loopPromise) {
+      return;
+    }
+
+    const durationSeconds = active.durationSeconds ?? 0;
+    const totalFrames = Math.max(1, Math.ceil(durationSeconds / active.frameDuration));
+
+    active.loopPromise = (async () => {
+      for (let frame = 0; frame < totalFrames; frame += 1) {
+        if (this.activeRecording !== active || active.finalizePromise) {
+          break;
+        }
+
+        const exportMode = active.mode === "fixed-delta" ? "fixed-delta" : "deterministic";
+
+        const timestamp = frame * active.frameDuration;
+        this.events.renderFrame({
+          mode: exportMode,
+          timestampSeconds: timestamp,
+          deltaSeconds: active.frameDuration,
+          frameIndex: frame
+        });
+        await active.source.add(timestamp, active.frameDuration);
+        active.frameIndex = frame + 1;
+
+        this.events.onStatus(
+          `${
+            active.mode === "deterministic" ? "Exporting deterministic" : "Exporting fixed delta"
+          }... ${Math.min(durationSeconds, active.frameIndex * active.frameDuration).toFixed(1)} / ${durationSeconds.toFixed(1)}s`
+        );
+        this.emitDiagnostics({
+          codec: active.codec,
+          framesCaptured: active.frameIndex,
+          recordedSeconds: active.frameIndex * active.frameDuration,
+          fileSizeBytes: null
+        });
+
+        if (frame % 10 === 0) {
+          await Promise.resolve();
+        }
+      }
+
+      await this.finalize(active);
+    })();
+
+    active.loopPromise.finally(() => {
+      if (this.activeRecording === active) {
+        active.loopPromise = null;
+      }
+    });
+  }
+
   private async finalize(active: ActiveRecording): Promise<void> {
     if (active.finalizePromise) {
       await active.finalizePromise;
@@ -237,6 +369,7 @@ export class BabylonSceneRecorder {
     active.finalizePromise = (async () => {
       this.stopLoop(active);
       active.source.close();
+      active.audioSource?.close();
       await active.output.finalize();
 
       const buffer = active.output.target.buffer;
@@ -259,6 +392,7 @@ export class BabylonSceneRecorder {
       this.activeRecording = null;
       this.events.onRecordingChange(false);
       this.events.onPauseChange(false);
+      this.events.setPreviewPlaybackEnabled(true);
       this.events.onStatus(`Saved MP4 after ${elapsedSeconds}s.`);
     })();
 
@@ -330,6 +464,27 @@ export class BabylonSceneRecorder {
 
     if (!codec) {
       throw new Error("No MP4-compatible video encoder is available in this browser.");
+    }
+
+    return codec;
+  }
+
+  private async getPreferredAudioCodec(track: MediaStreamTrack): Promise<"aac" | "opus" | "mp3" | "vorbis" | "flac" | "ac3" | "eac3"> {
+    const settings = track.getSettings();
+    const sampleRate = settings.sampleRate ?? 48_000;
+    const numberOfChannels = settings.channelCount ?? 2;
+
+    if (await canEncodeAudio("aac", { sampleRate, numberOfChannels, bitrate: 128_000 })) {
+      return "aac";
+    }
+
+    const codec = await getFirstEncodableAudioCodec(
+      new Mp4OutputFormat().getSupportedAudioCodecs(),
+      { sampleRate, numberOfChannels, bitrate: 128_000 }
+    );
+
+    if (!codec || (codec !== "aac" && codec !== "opus" && codec !== "mp3" && codec !== "vorbis" && codec !== "flac" && codec !== "ac3" && codec !== "eac3")) {
+      throw new Error("No MP4-compatible audio encoder is available in this browser.");
     }
 
     return codec;
