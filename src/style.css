@@ -34,10 +34,17 @@ select {
 }
 
 .panel {
+  display: flex;
+  flex-direction: column;
   padding: 1.25rem;
   background: rgba(7, 12, 20, 0.72);
   backdrop-filter: blur(18px);
   border-right: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.panel-body {
+  display: grid;
+  gap: 0;
 }
 
 .eyebrow {
@@ -59,6 +66,26 @@ h1 {
   color: rgba(246, 242, 233, 0.78);
   line-height: 1.35;
   font-size: 0.92rem;
+}
+
+.lede-offline {
+  font-size: 0.84rem;
+}
+
+.lede-live {
+  font-size: 0.84rem;
+}
+
+.lede-warning {
+  color: #ffbb69;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.lede-live-label {
+  color: #78e08f;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
 }
 
 .section {
@@ -90,14 +117,11 @@ h1 {
   align-items: center;
   gap: 0.45rem;
   min-width: 0;
+  flex-wrap: wrap;
 }
 
 .field-wide {
   grid-column: 1 / -1;
-}
-
-.hidden {
-  display: none;
 }
 
 .field span {
@@ -123,13 +147,22 @@ h1 {
   padding: 0.5rem 0.62rem;
   border: 1px solid rgba(255, 255, 255, 0.14);
   border-radius: 10px;
-  background: rgba(255, 255, 255, 0.08);
-  color: inherit;
+  background-color: rgba(16, 36, 58, 0.92);
+  color: #f6f2e9;
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+}
+
+.field select option {
+  background-color: #10243a;
+  color: #f6f2e9;
 }
 
 .hint {
   flex-basis: 100%;
-  margin-left: calc(4.7rem + 0.45rem);
+  min-width: 0;
+  margin-left: 0;
   color: rgba(246, 242, 233, 0.58);
   line-height: 1.3;
   font-size: 0.67rem;
@@ -167,13 +200,42 @@ h1 {
 
 .actions-secondary button {
   min-width: 6.25rem;
-  background: rgba(255, 255, 255, 0.08);
-  color: inherit;
+  color: #f6f2e9;
 }
 
-.actions button:disabled {
+#show-preview {
+  background: linear-gradient(135deg, #2f7de1, #1d4f9c);
+}
+
+#download-video {
+  background: linear-gradient(135deg, #3ba66b, #1f6f47);
+}
+
+#start-recording:disabled,
+#pause-recording:disabled,
+#stop-recording:disabled,
+.actions-secondary button:disabled {
   cursor: not-allowed;
-  opacity: 0.5;
+  opacity: 1;
+  box-shadow: none;
+  transform: none;
+}
+
+#start-recording:disabled,
+#pause-recording:disabled,
+#stop-recording:disabled {
+  background: linear-gradient(135deg, #8f4f2d, #a8642f);
+  color: rgba(246, 242, 233, 0.55);
+  border-color: rgba(255, 187, 105, 0.18);
+}
+
+.actions-secondary button:disabled {
+  cursor: not-allowed;
+  opacity: 1;
+  background: rgba(255, 255, 255, 0.12);
+  color: rgba(246, 242, 233, 0.5);
+  border-color: rgba(255, 255, 255, 0.12);
+  filter: grayscale(1);
 }
 
 .status {
@@ -222,6 +284,10 @@ h1 {
   opacity: 0.5;
 }
 
+.hidden {
+  display: none;
+}
+
 .diagnostics {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -249,11 +315,36 @@ h1 {
   font-size: 0.9rem;
 }
 
-.modes {
+.mode-info {
   margin-top: 0.7rem;
   color: rgba(246, 242, 233, 0.7);
   line-height: 1.3;
   font-size: 0.8rem;
+}
+
+.panel-footer {
+  margin-top: auto;
+  padding-top: 1rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  display: grid;
+  gap: 0.3rem;
+}
+
+.panel-footer-copy {
+  margin: 0;
+  color: rgba(246, 242, 233, 0.66);
+  font-size: 0.78rem;
+}
+
+.panel-footer a {
+  color: rgba(246, 242, 233, 0.66);
+  font-size: 0.78rem;
+  text-decoration: none;
+  transition: color 140ms ease;
+}
+
+.panel-footer a:hover {
+  color: #9ed8ff;
 }
 
 .viewport {
@@ -294,13 +385,36 @@ h1 {
   font-size: 1.1rem;
 }
 
+.preview-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
 .preview-head button {
-  padding: 0.7rem 1rem;
+  width: 2.5rem;
+  height: 2.5rem;
+  padding: 0;
   border: 0;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.12);
-  color: inherit;
+  color: #f6f2e9;
   cursor: pointer;
+  font-size: 1.15rem;
+  font-weight: 700;
+  transition: transform 140ms ease, filter 140ms ease;
+}
+
+#preview-download {
+  background: linear-gradient(135deg, #1d4f9c, #102c5f);
+}
+
+#close-preview {
+  background: linear-gradient(135deg, #163e7d, #0b1f45);
+}
+
+.preview-head button:hover {
+  transform: scale(0.94);
+  filter: brightness(1.08);
 }
 
 #preview-video {
@@ -317,6 +431,7 @@ h1 {
   height: 100%;
   display: block;
   touch-action: none;
+  outline: none;
 }
 
 @media (max-width: 900px) {
@@ -332,14 +447,6 @@ h1 {
 
   .controls {
     grid-template-columns: 1fr;
-  }
-
-  .field {
-    flex-wrap: wrap;
-  }
-
-  .hint {
-    margin-left: 0;
   }
 
   .diagnostics {

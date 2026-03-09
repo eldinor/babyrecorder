@@ -1,4 +1,4 @@
-# Baby Recorder
+# BabyRecorder
 
 Small Vite + TypeScript app for recording a live Babylon.js scene to MP4 with MediaBunny.
 
