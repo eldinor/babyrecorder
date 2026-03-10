@@ -13,6 +13,8 @@ import {
   getFirstEncodableVideoCodec
 } from "mediabunny";
 
+const AUDIO_BITRATE = 192_000;
+
 type RecorderEvents = {
   onStatus: (message: string) => void;
   onRecordingChange: (isRecording: boolean) => void;
@@ -130,7 +132,7 @@ export class BabylonSceneRecorder {
       const audioCodec = await this.getPreferredAudioCodec(options.audioTrack, format);
       audioSource = new MediaStreamAudioTrackSource(options.audioTrack as MediaStreamAudioTrack, {
         codec: audioCodec,
-        bitrate: 128_000
+        bitrate: AUDIO_BITRATE
       });
       output.addAudioTrack(audioSource);
     }
@@ -510,14 +512,14 @@ export class BabylonSceneRecorder {
 
     if (
       format instanceof Mp4OutputFormat &&
-      await canEncodeAudio("aac", { sampleRate, numberOfChannels, bitrate: 128_000 })
+      await canEncodeAudio("aac", { sampleRate, numberOfChannels, bitrate: AUDIO_BITRATE })
     ) {
       return "aac";
     }
 
     const codec = await getFirstEncodableAudioCodec(
       format.getSupportedAudioCodecs(),
-      { sampleRate, numberOfChannels, bitrate: 128_000 }
+      { sampleRate, numberOfChannels, bitrate: AUDIO_BITRATE }
     );
 
     if (!codec || (codec !== "aac" && codec !== "opus" && codec !== "mp3" && codec !== "vorbis" && codec !== "flac" && codec !== "ac3" && codec !== "eac3")) {

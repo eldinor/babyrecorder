@@ -119,7 +119,18 @@ app.innerHTML = `
         <div class="meta">
           <p id="status" class="status">Idle</p>
           <div class="audio-tools">
-            <p id="audio-status" class="audio-status">Scene audio: checking browser support.</p>
+            <div class="audio-meta">
+              <p id="audio-status" class="audio-status">Scene audio: checking browser support.</p>
+              <label class="audio-checkbox" for="use-microphone-audio">
+                <input id="use-microphone-audio" type="checkbox" />
+                <span>Use microphone audio</span>
+              </label>
+              <label class="audio-level" for="microphone-level">
+                <span>Mic level</span>
+                <input id="microphone-level" type="range" min="1" max="300" step="1" value="180" />
+                <strong id="microphone-level-value">180%</strong>
+              </label>
+            </div>
             <button id="play-sample-sound" type="button">Play Sample Sound</button>
           </div>
           <div class="diagnostics">
@@ -179,6 +190,9 @@ const showPreviewButton = document.querySelector<HTMLButtonElement>("#show-previ
 const downloadVideoButton = document.querySelector<HTMLButtonElement>("#download-video");
 const audioTools = document.querySelector<HTMLElement>(".audio-tools");
 const audioStatus = document.querySelector<HTMLParagraphElement>("#audio-status");
+const useMicrophoneAudioInput = document.querySelector<HTMLInputElement>("#use-microphone-audio");
+const microphoneLevelInput = document.querySelector<HTMLInputElement>("#microphone-level");
+const microphoneLevelValue = document.querySelector<HTMLElement>("#microphone-level-value");
 const playSampleSoundButton = document.querySelector<HTMLButtonElement>("#play-sample-sound");
 const previewDialog = document.querySelector<HTMLDialogElement>("#preview-dialog");
 const previewVideo = document.querySelector<HTMLVideoElement>("#preview-video");
@@ -213,6 +227,9 @@ if (
   !downloadVideoButton ||
   !audioTools ||
   !audioStatus ||
+  !useMicrophoneAudioInput ||
+  !microphoneLevelInput ||
+  !microphoneLevelValue ||
   !playSampleSoundButton ||
   !previewDialog ||
   !previewVideo ||
@@ -354,7 +371,20 @@ let fixedDeltaSceneTime = 0;
 let activeMode: "realtime" | "deterministic" | "fixed-delta" | null = null;
 let sampleSound: Sound | null = null;
 let sceneAudioDestination: MediaStreamAudioDestinationNode | null = null;
+let microphoneStream: MediaStream | null = null;
+let mixedRecordingTrack: MediaStreamTrack | null = null;
+let releaseRecordingAudio: (() => void) | null = null;
+let activeMicGainNode: GainNode | null = null;
 let isRecordingActive = false;
+
+const getMicrophoneLevel = () => Number(microphoneLevelInput.value) / 100;
+
+const updateMicrophoneLevelUi = () => {
+  microphoneLevelValue.textContent = `${microphoneLevelInput.value}%`;
+  if (activeMicGainNode) {
+    activeMicGainNode.gain.value = getMicrophoneLevel();
+  }
+};
 
 const updateAudioStatus = () => {
   const audioContext = Engine.audioEngine?.audioContext ?? null;
@@ -416,6 +446,98 @@ const ensureSceneAudioTrack = (): MediaStreamTrack | null => {
   return sceneAudioDestination.stream.getAudioTracks()[0] ?? null;
 };
 
+const releaseRecordingAudioGraph = () => {
+  releaseRecordingAudio?.();
+  releaseRecordingAudio = null;
+  activeMicGainNode = null;
+
+  if (mixedRecordingTrack) {
+    mixedRecordingTrack.stop();
+    mixedRecordingTrack = null;
+  }
+
+  if (microphoneStream) {
+    for (const track of microphoneStream.getTracks()) {
+      track.stop();
+    }
+
+    microphoneStream = null;
+  }
+};
+
+const ensureMicrophoneStream = async (): Promise<MediaStream> => {
+  if (microphoneStream) {
+    const activeTrack = microphoneStream.getAudioTracks()[0];
+    if (activeTrack && activeTrack.readyState === "live") {
+      return microphoneStream;
+    }
+
+    releaseRecordingAudioGraph();
+  }
+
+  if (!navigator.mediaDevices?.getUserMedia) {
+    throw new Error("Microphone capture is not supported in this browser.");
+  }
+
+  microphoneStream = await navigator.mediaDevices.getUserMedia({
+    audio: {
+      channelCount: { ideal: 2 },
+      sampleRate: { ideal: 48_000 },
+      sampleSize: { ideal: 24 },
+      echoCancellation: false,
+      noiseSuppression: false,
+      autoGainControl: false,
+    }
+  });
+
+  return microphoneStream;
+};
+
+const ensureRecordingAudioTrack = async (includeMicrophone: boolean): Promise<MediaStreamTrack | null> => {
+  releaseRecordingAudioGraph();
+
+  const sceneTrack = ensureSceneAudioTrack();
+  if (!includeMicrophone) {
+    return sceneTrack;
+  }
+
+  const micStream = await ensureMicrophoneStream();
+  const micTrack = micStream.getAudioTracks()[0] ?? null;
+  if (!sceneTrack) {
+    return micTrack;
+  }
+
+  const audioContext = Engine.audioEngine?.audioContext ?? null;
+  if (!audioContext) {
+    return micTrack ?? sceneTrack;
+  }
+
+  const mixedDestination = audioContext.createMediaStreamDestination();
+  const sceneSource = audioContext.createMediaStreamSource(new MediaStream([sceneTrack]));
+  const sceneGain = audioContext.createGain();
+  sceneGain.gain.value = 1;
+
+  const micSource = audioContext.createMediaStreamSource(micStream);
+  const micGain = audioContext.createGain();
+  micGain.gain.value = getMicrophoneLevel();
+
+  sceneSource.connect(sceneGain);
+  sceneGain.connect(mixedDestination);
+  micSource.connect(micGain);
+  micGain.connect(mixedDestination);
+
+  activeMicGainNode = micGain;
+  mixedRecordingTrack = mixedDestination.stream.getAudioTracks()[0] ?? null;
+  releaseRecordingAudio = () => {
+    sceneSource.disconnect();
+    sceneGain.disconnect();
+    micSource.disconnect();
+    micGain.disconnect();
+  };
+
+  return mixedRecordingTrack;
+};
+
 const recorder = new BabylonSceneRecorder(canvas, {
   onStatus: (message) => {
     status.textContent = message;
@@ -424,6 +546,8 @@ const recorder = new BabylonSceneRecorder(canvas, {
     isRecordingActive = isRecording;
     outputFormatInput.disabled = isRecording;
     modeInput.disabled = isRecording;
+    useMicrophoneAudioInput.disabled = isRecording;
+    microphoneLevelInput.disabled = isRecording;
     fpsInput.disabled = isRecording && activeMode === "fixed-delta";
     durationInput.disabled = isRecording;
     fixedDeltaInput.disabled = isRecording;
@@ -431,6 +555,7 @@ const recorder = new BabylonSceneRecorder(canvas, {
     stopButton.disabled = !isRecording;
     pauseButton.disabled = !isRecording || activeMode === "deterministic" || activeMode === "fixed-delta";
     if (!isRecording) {
+      releaseRecordingAudioGraph();
       pauseButton.textContent = "Pause";
       activeMode = null;
       syncModeUi();
@@ -543,6 +668,8 @@ fixedDeltaInput.addEventListener("input", updateFixedDeltaFps);
 updateFixedDeltaFps();
 syncModeUi();
 updateAudioStatus();
+updateMicrophoneLevelUi();
+microphoneLevelInput.addEventListener("input", updateMicrophoneLevelUi);
 
 startButton.addEventListener("click", async () => {
   const frameRate = Number(modeInput.value === "deterministic" ? deterministicFpsInput.value : fpsInput.value);
@@ -594,7 +721,10 @@ startButton.addEventListener("click", async () => {
       bitrate: bitrateMbps * 1_000_000,
       durationSeconds: modeInput.value === "realtime" ? undefined : durationSeconds,
       fixedDeltaMs: modeInput.value === "fixed-delta" ? fixedDeltaMs : undefined,
-      audioTrack: modeInput.value === "realtime" ? ensureSceneAudioTrack() : null,
+      audioTrack:
+        modeInput.value === "realtime"
+          ? await ensureRecordingAudioTrack(useMicrophoneAudioInput.checked)
+          : null,
     });
   } catch (error) {
     activeMode = null;
