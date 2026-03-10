@@ -2,8 +2,11 @@ import {
   BufferTarget,
   CanvasSource,
   MediaStreamAudioTrackSource,
+  MkvOutputFormat,
+  MovOutputFormat,
   Mp4OutputFormat,
   Output,
+  WebMOutputFormat,
   canEncodeAudio,
   canEncodeVideo,
   getFirstEncodableAudioCodec,
@@ -37,6 +40,7 @@ export type RecorderDiagnostics = {
 
 type StartRecordingOptions = {
   mode: "realtime" | "deterministic" | "fixed-delta";
+  outputFormat: OutputFormatOption;
   frameRate: number;
   bitrate: number;
   durationSeconds?: number;
@@ -44,9 +48,13 @@ type StartRecordingOptions = {
   audioTrack?: MediaStreamTrack | null;
 };
 
+export type OutputFormatOption = "mp4" | "webm" | "mkv" | "mov";
+
+type SupportedOutputFormat = Mp4OutputFormat | WebMOutputFormat | MkvOutputFormat | MovOutputFormat;
+
 type ActiveRecording = {
   mode: "realtime" | "deterministic" | "fixed-delta";
-  output: Output<Mp4OutputFormat, BufferTarget>;
+  output: Output<SupportedOutputFormat, BufferTarget>;
   source: CanvasSource;
   audioSource: MediaStreamAudioTrackSource | null;
   loopPromise: Promise<void> | null;
@@ -56,6 +64,7 @@ type ActiveRecording = {
   paused: boolean;
   finalizePromise: Promise<void> | null;
   codec: string;
+  format: OutputFormatOption;
   sleepResolver: (() => void) | null;
   durationSeconds: number | null;
 };
@@ -66,6 +75,7 @@ export class BabylonSceneRecorder {
   private activeRecording: ActiveRecording | null = null;
   private previewUrl: string | null = null;
   private downloadBlob: Blob | null = null;
+  private lastFileExtension = ".mp4";
 
   constructor(canvas: HTMLCanvasElement, events: RecorderEvents) {
     this.canvas = canvas;
@@ -93,10 +103,11 @@ export class BabylonSceneRecorder {
       }
     }
 
-    const codec = await this.getPreferredCodec(options);
+    const format = this.createOutputFormat(options.outputFormat);
+    const codec = await this.getPreferredCodec(format, options);
     const target = new BufferTarget();
     const output = new Output({
-      format: new Mp4OutputFormat(),
+      format,
       target
     });
 
@@ -116,7 +127,7 @@ export class BabylonSceneRecorder {
     });
 
     if (options.mode === "realtime" && options.audioTrack) {
-      const audioCodec = await this.getPreferredAudioCodec(options.audioTrack);
+      const audioCodec = await this.getPreferredAudioCodec(options.audioTrack, format);
       audioSource = new MediaStreamAudioTrackSource(options.audioTrack as MediaStreamAudioTrack, {
         codec: audioCodec,
         bitrate: 128_000
@@ -146,6 +157,7 @@ export class BabylonSceneRecorder {
       paused: false,
       finalizePromise: null,
       codec,
+      format: options.outputFormat,
       sleepResolver: null,
       durationSeconds: options.mode === "realtime" ? null : options.durationSeconds ?? null
     };
@@ -165,8 +177,8 @@ export class BabylonSceneRecorder {
       this.events.onPauseChange(true);
       this.events.onStatus(
         options.mode === "deterministic"
-          ? `Exporting deterministic MP4 with ${codec.toUpperCase()} at ${options.frameRate} FPS for ${options.durationSeconds}s.`
-          : `Exporting fixed-delta MP4 with ${codec.toUpperCase()} at ${options.fixedDeltaMs} ms step (${outputFrameRate.toFixed(2)} FPS) for ${options.durationSeconds}s.`
+          ? `Exporting deterministic ${format.fileExtension.slice(1).toUpperCase()} with ${codec.toUpperCase()} at ${options.frameRate} FPS for ${options.durationSeconds}s.`
+          : `Exporting fixed-delta ${format.fileExtension.slice(1).toUpperCase()} with ${codec.toUpperCase()} at ${options.fixedDeltaMs} ms step (${outputFrameRate.toFixed(2)} FPS) for ${options.durationSeconds}s.`
       );
       this.startOfflineLoop();
       return;
@@ -174,7 +186,7 @@ export class BabylonSceneRecorder {
 
     this.startLoop();
     this.events.onStatus(
-      `Recording ${options.mode} MP4 with ${codec.toUpperCase()} at ${options.frameRate} FPS.`
+      `Recording ${options.mode} ${format.fileExtension.slice(1).toUpperCase()} with ${codec.toUpperCase()} at ${options.frameRate} FPS.`
     );
   }
 
@@ -381,6 +393,7 @@ export class BabylonSceneRecorder {
       const blob = new Blob([buffer], { type: active.output.format.mimeType });
       const url = URL.createObjectURL(blob);
       this.setPreviewUrl(url);
+      this.lastFileExtension = active.output.format.fileExtension;
       this.setDownloadBlob(blob);
       this.emitDiagnostics({
         codec: active.codec,
@@ -393,7 +406,7 @@ export class BabylonSceneRecorder {
       this.events.onRecordingChange(false);
       this.events.onPauseChange(false);
       this.events.setPreviewPlaybackEnabled(true);
-      this.events.onStatus(`Saved MP4 after ${elapsedSeconds}s.`);
+      this.events.onStatus(`Saved ${active.output.format.fileExtension.slice(1).toUpperCase()} after ${elapsedSeconds}s.`);
     })();
 
     await active.finalizePromise;
@@ -447,44 +460,68 @@ export class BabylonSceneRecorder {
     });
   }
 
+  private createOutputFormat(format: OutputFormatOption): SupportedOutputFormat {
+    switch (format) {
+      case "webm":
+        return new WebMOutputFormat();
+      case "mkv":
+        return new MkvOutputFormat();
+      case "mov":
+        return new MovOutputFormat();
+      case "mp4":
+      default:
+        return new Mp4OutputFormat();
+    }
+  }
+
   private async getPreferredCodec(
+    format: SupportedOutputFormat,
     options: StartRecordingOptions
   ): Promise<"avc" | "vp9" | "av1" | "hevc" | "vp8"> {
     const width = this.canvas.width || this.canvas.clientWidth;
     const height = this.canvas.height || this.canvas.clientHeight;
 
-    if (await canEncodeVideo("avc", { width, height, bitrate: options.bitrate })) {
+    if (
+      format instanceof Mp4OutputFormat &&
+      await canEncodeVideo("avc", { width, height, bitrate: options.bitrate })
+    ) {
       return "avc";
     }
 
     const codec = await getFirstEncodableVideoCodec(
-      new Mp4OutputFormat().getSupportedVideoCodecs(),
+      format.getSupportedVideoCodecs(),
       { width, height, bitrate: options.bitrate }
     );
 
     if (!codec) {
-      throw new Error("No MP4-compatible video encoder is available in this browser.");
+      throw new Error(`No ${format.fileExtension.slice(1).toUpperCase()}-compatible video encoder is available in this browser.`);
     }
 
     return codec;
   }
 
-  private async getPreferredAudioCodec(track: MediaStreamTrack): Promise<"aac" | "opus" | "mp3" | "vorbis" | "flac" | "ac3" | "eac3"> {
+  private async getPreferredAudioCodec(
+    track: MediaStreamTrack,
+    format: SupportedOutputFormat
+  ): Promise<"aac" | "opus" | "mp3" | "vorbis" | "flac" | "ac3" | "eac3"> {
     const settings = track.getSettings();
     const sampleRate = settings.sampleRate ?? 48_000;
     const numberOfChannels = settings.channelCount ?? 2;
 
-    if (await canEncodeAudio("aac", { sampleRate, numberOfChannels, bitrate: 128_000 })) {
+    if (
+      format instanceof Mp4OutputFormat &&
+      await canEncodeAudio("aac", { sampleRate, numberOfChannels, bitrate: 128_000 })
+    ) {
       return "aac";
     }
 
     const codec = await getFirstEncodableAudioCodec(
-      new Mp4OutputFormat().getSupportedAudioCodecs(),
+      format.getSupportedAudioCodecs(),
       { sampleRate, numberOfChannels, bitrate: 128_000 }
     );
 
     if (!codec || (codec !== "aac" && codec !== "opus" && codec !== "mp3" && codec !== "vorbis" && codec !== "flac" && codec !== "ac3" && codec !== "eac3")) {
-      throw new Error("No MP4-compatible audio encoder is available in this browser.");
+      throw new Error(`No ${format.fileExtension.slice(1).toUpperCase()}-compatible audio encoder is available in this browser.`);
     }
 
     return codec;
@@ -501,6 +538,6 @@ export class BabylonSceneRecorder {
       String(now.getSeconds()).padStart(2, "0")
     ];
 
-    return `babylon-scene-${parts.join("-")}.mp4`;
+    return `babylon-scene-${parts.join("-")}${this.lastFileExtension}`;
   }
 }

@@ -1,6 +1,6 @@
 # BabyRecorder User Guide
 
-BabyRecorder records Babylon.js scenes to video with MediaBunny. The app supports live recording and two offline export modes, with MP4 as the default output.
+BabyRecorder records Babylon.js scenes to video with MediaBunny. The app supports live recording and two offline export modes, with MP4, WebM, MKV, and MOV output options.
 
 ## Quick Start
 
@@ -19,7 +19,7 @@ BabyRecorder records Babylon.js scenes to video with MediaBunny. The app support
 This mode records the live Babylon canvas exactly as it is being rendered in the browser.
 
 - Uses live scene timing.
-- Supports scene audio in the recorded MP4.
+- Supports scene audio in the recorded output file.
 - Lets you `Pause`, `Resume`, and `Stop` manually.
 - Best when you want to capture interaction or the live viewport as-is.
 
@@ -45,6 +45,15 @@ This is also an offline mode, but it advances the scene using a fixed simulation
 - Best when your animation logic should advance with a specific constant step.
 
 ## Controls
+
+### Format
+
+Chooses the output container for the exported video file.
+
+- `MP4 (.mp4)`: default general-purpose option
+- `WebM (.webm)`: web-friendly alternative
+- `MKV (.mkv)`: Matroska container
+- `MOV (.mov)`: QuickTime container
 
 ### Mode
 
@@ -155,7 +164,7 @@ Saves the last recorded video file to disk.
 The app includes a sample Babylon scene sound to verify that audio is working.
 
 - `Play Sample Sound` only appears in `Realtime Capture`.
-- Realtime MP4 recording can include Babylon scene audio.
+- Realtime recording can include Babylon scene audio.
 - Offline modes currently export video without audio.
 
 If you do not hear sound:

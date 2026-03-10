@@ -10,8 +10,13 @@ import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder";
 import { Scene } from "@babylonjs/core/scene";
 import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
 import "./style.css";
-import { BabylonSceneRecorder, type RecorderDiagnostics, type RenderFrameRequest } from "./recorder";
-import { Mp4OutputFormat } from "mediabunny";
+import {
+  BabylonSceneRecorder,
+  type OutputFormatOption,
+  type RecorderDiagnostics,
+  type RenderFrameRequest
+} from "./recorder";
+import { MkvOutputFormat, MovOutputFormat, Mp4OutputFormat, WebMOutputFormat } from "mediabunny";
 
 const app = document.querySelector<HTMLDivElement>("#app");
 
@@ -23,11 +28,29 @@ app.innerHTML = `
   <div class="shell">
     <section class="panel">
       <div class="panel-body">
-        <p class="eyebrow">DEMO: Babylon Scene to MP4</p>
+        <p class="eyebrow">DEMO: Babylon Scene to Video</p>
         <h1>BabyRecorder</h1>
         <p id="lede" class="lede">
-          Records the live Babylon canvas with MediaBunny and exports a default MP4 file.
+          Records the live Babylon canvas with MediaBunny and exports a video file.
         </p>
+        <div class="section">
+          <p class="section-title">Output</p>
+          <div class="controls controls-output">
+            <label class="field">
+              <span>Format</span>
+              <select id="output-format">
+                <option value="mp4">MP4 (.mp4)</option>
+                <option value="webm">WebM (.webm)</option>
+                <option value="mkv">MKV (.mkv)</option>
+                <option value="mov">MOV (.mov)</option>
+              </select>
+            </label>
+            <label class="field">
+              <span>Bitrate Mbps</span>
+              <input id="bitrate" type="number" min="1" max="50" step="0.5" value="8" />
+            </label>
+          </div>
+        </div>
         <div class="section">
           <p class="section-title">Capture</p>
           <div class="controls controls-mode">
@@ -65,15 +88,6 @@ app.innerHTML = `
             <label class="field">
               <span>Duration Seconds</span>
               <input id="duration-fixed-delta" type="number" min="1" max="1200" step="1" value="5" />
-            </label>
-          </div>
-        </div>
-        <div class="section">
-          <p class="section-title">Output</p>
-          <div class="controls controls-output">
-            <label class="field">
-              <span>Bitrate Mbps</span>
-              <input id="bitrate" type="number" min="1" max="50" step="0.5" value="8" />
             </label>
           </div>
         </div>
@@ -135,6 +149,7 @@ app.innerHTML = `
 const canvas = document.querySelector<HTMLCanvasElement>("#render-canvas");
 const status = document.querySelector<HTMLParagraphElement>("#status");
 const lede = document.querySelector<HTMLParagraphElement>("#lede");
+const outputFormatInput = document.querySelector<HTMLSelectElement>("#output-format");
 const modeInput = document.querySelector<HTMLSelectElement>("#mode");
 const modeInfo = document.querySelector<HTMLElement>("#mode-info");
 const fpsInput = document.querySelector<HTMLInputElement>("#fps");
@@ -168,6 +183,7 @@ if (
   !canvas ||
   !status ||
   !lede ||
+  !outputFormatInput ||
   !modeInput ||
   !modeInfo ||
   !fpsInput ||
@@ -215,9 +231,17 @@ renderDiagnostics({
   fileSizeBytes: null,
 });
 
-const mp4Format = new Mp4OutputFormat();
-console.log("BabyRecorder MP4 video codecs:", mp4Format.getSupportedVideoCodecs());
-console.log("BabyRecorder MP4 audio codecs:", mp4Format.getSupportedAudioCodecs());
+const outputFormats = {
+  mp4: new Mp4OutputFormat(),
+  webm: new WebMOutputFormat(),
+  mkv: new MkvOutputFormat(),
+  mov: new MovOutputFormat(),
+} satisfies Record<OutputFormatOption, Mp4OutputFormat | WebMOutputFormat | MkvOutputFormat | MovOutputFormat>;
+
+for (const [key, format] of Object.entries(outputFormats)) {
+  console.log(`BabyRecorder ${key.toUpperCase()} video codecs:`, format.getSupportedVideoCodecs());
+  console.log(`BabyRecorder ${key.toUpperCase()} audio codecs:`, format.getSupportedAudioCodecs());
+}
 
 const engine = new Engine(canvas, true, {
   audioEngine: true,
@@ -378,6 +402,7 @@ const recorder = new BabylonSceneRecorder(canvas, {
   },
   onRecordingChange: (isRecording) => {
     isRecordingActive = isRecording;
+    outputFormatInput.disabled = isRecording;
     modeInput.disabled = isRecording;
     fpsInput.disabled = isRecording && activeMode === "fixed-delta";
     durationInput.disabled = isRecording;
@@ -457,7 +482,7 @@ const syncModeUi = () => {
     lede.classList.remove("lede-offline");
     lede.classList.add("lede-live");
     lede.innerHTML =
-      '<span class="lede-live-label">LIVE MODE:</span> records the live Babylon canvas with MediaBunny and exports a default MP4 file.';
+      '<span class="lede-live-label">LIVE MODE:</span> records the live Babylon canvas with MediaBunny and exports a video file.';
     modeInput.title = "Realtime records the live Babylon canvas.";
     modeInfo.className = "mode-info lede-live";
     modeInfo.innerHTML = '<span class="lede-live-label">LIVE MODE:</span> records the live Babylon canvas.';
@@ -544,6 +569,7 @@ startButton.addEventListener("click", async () => {
     activeMode = modeInput.value as "realtime" | "deterministic" | "fixed-delta";
     await recorder.start({
       mode: activeMode,
+      outputFormat: outputFormatInput.value as OutputFormatOption,
       frameRate,
       bitrate: bitrateMbps * 1_000_000,
       durationSeconds: modeInput.value === "realtime" ? undefined : durationSeconds,

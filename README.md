@@ -1,6 +1,6 @@
 # BabyRecorder
 
-Small Vite + TypeScript app for recording a live Babylon.js scene to MP4 with MediaBunny.
+Small Vite + TypeScript app for recording a live Babylon.js scene to video with MediaBunny.
 
 ## Stack
 
@@ -25,7 +25,7 @@ npm run build
 ## Current Behavior
 
 - Renders a Babylon scene in real time
-- Records the live canvas into MP4
+- Records the live canvas into MP4, WebM, MKV, or MOV
 - Supports manual start, pause, resume, and stop
 - Does not auto-download after stop
 - Lets you preview the recorded video in a popover
