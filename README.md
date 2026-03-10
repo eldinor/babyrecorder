@@ -1,13 +1,13 @@
 # BabyRecorder
 
-Small Vite + TypeScript app for recording a live Babylon.js scene to video with MediaBunny.
+BabyRecorder is a small Vite + TypeScript app for recording a Babylon.js scene to video with MediaBunny.
 
 ## Stack
 
 - Vite
 - TypeScript
 - Babylon.js `8.54.1`
-- MediaBunny
+- MediaBunny `1.23.0`
 
 ## Run
 
@@ -22,22 +22,31 @@ npm run dev
 npm run build
 ```
 
-## Current Behavior
+## Features
 
-- Renders a Babylon scene in real time
-- Records the live canvas into MP4, WebM, MKV, or MOV
-- Supports manual start, pause, resume, and stop
-- Does not auto-download after stop
-- Lets you preview the recorded video in a popover
-- Lets you download the recorded video explicitly
-- Shows basic diagnostics:
-  - codec
-  - captured frames
-  - recorded duration
-  - final file size
+- Records Babylon canvas output to `MP4`, `WebM`, `MKV`, or `MOV`
+- Supports three capture modes:
+  - `Realtime Capture`
+  - `Fast Export`
+  - `Fixed Delta`
+- Realtime mode supports:
+  - pause and resume
+  - Babylon scene audio
+  - optional microphone recording
+  - adjustable microphone level
+- Includes in-app preview and explicit download
+- Shows diagnostics for codec, frames, duration, and file size
+
+## Audio
+
+- Babylon scene audio is available in `Realtime Capture`
+- `Use microphone audio` adds microphone input to the recorded file
+- `Mic level` controls recorded microphone gain
+- `Play Sample Sound` is a quick check that scene audio capture is working
+- Offline export modes currently do not record audio
 
 ## Notes
 
-- The current recorder mode is realtime capture only.
-- Scene animation is driven by Babylon realtime delta time.
-- Deterministic frame-by-frame export is not implemented in the current stable version.
+- Browser codec support varies by browser and OS
+- Final output is held in browser memory before download
+- Microphone access requires browser permission

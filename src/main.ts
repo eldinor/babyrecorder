@@ -82,7 +82,7 @@ app.innerHTML = `
           <div id="deterministic-controls" class="controls hidden">
             <label class="field">
               <span>FPS</span>
-              <input id="fps-deterministic" type="number" min="1" max="60" value="30" />
+              <input id="fps-deterministic" type="number" min="1" max="60" value="60" />
             </label>
             <label id="duration-field" class="field">
               <span>Duration Seconds</span>

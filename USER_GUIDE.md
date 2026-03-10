@@ -1,133 +1,116 @@
 # BabyRecorder User Guide
 
-BabyRecorder records Babylon.js scenes to video with MediaBunny. The app supports live recording and two offline export modes, with MP4, WebM, MKV, and MOV output options.
+BabyRecorder records Babylon.js scenes to video with MediaBunny.
 
 ## Quick Start
 
-1. Open the app.
-2. Choose a mode.
-3. Adjust the capture settings.
-4. Press `Record`.
-5. Press `Stop` when finished, or wait for an offline export to complete.
-6. Use `Preview` to watch the result.
-7. Use `Download` to save the video file.
+1. Choose an output `Format`.
+2. Choose a `Mode`.
+3. Adjust FPS, bitrate, and duration if needed.
+4. In `Realtime Capture`, optionally enable `Use microphone audio`.
+5. Press `Record`.
+6. Press `Stop` when finished, or let offline export finish automatically.
+7. Use `Preview` to check the result.
+8. Use `Download` to save the video file.
 
 ## Modes
 
 ### Realtime Capture
 
-This mode records the live Babylon canvas exactly as it is being rendered in the browser.
+Records the Babylon canvas live as it is rendered in the browser.
 
-- Uses live scene timing.
-- Supports scene audio in the recorded output file.
-- Lets you `Pause`, `Resume`, and `Stop` manually.
-- Best when you want to capture interaction or the live viewport as-is.
+- Supports Babylon scene audio
+- Supports optional microphone audio
+- Supports `Pause`, `Resume`, and `Stop`
+- Best for interactive or live viewport capture
 
 ### Fast Export
 
-This is an offline mode. It renders frames as fast as possible instead of waiting for live browser timing.
+Offline export that renders frames as fast as possible.
 
-- Uses the selected FPS and duration.
-- Produces a fixed-length video export.
-- Finishes automatically.
-- Does not currently include audio.
-- Best when you want a fast offline render with exact frame timestamps.
+- Uses the selected FPS and duration
+- Finishes automatically
+- Does not currently include audio
+- Best for fast fixed-length export
 
 ### Fixed Delta
 
-This is also an offline mode, but it advances the scene using a fixed simulation step on every frame.
+Offline export that advances the scene by a constant simulation step.
 
-- Uses `Fixed Delta Ms` as the scene step.
-- Shows the related FPS derived from that delta.
-- Uses the selected duration.
-- Finishes automatically.
-- Does not currently include audio.
-- Best when your animation logic should advance with a specific constant step.
+- Uses `Fixed Delta Ms` plus duration
+- Finishes automatically
+- Does not currently include audio
+- Best when animation timing should advance with a strict step
 
 ## Controls
 
 ### Format
 
-Chooses the output container for the exported video file.
+Output container for the exported file.
 
-- `MP4 (.mp4)`: default general-purpose option
-- `WebM (.webm)`: web-friendly alternative
-- `MKV (.mkv)`: Matroska container
-- `MOV (.mov)`: QuickTime container
+- `MP4 (.mp4)`
+- `WebM (.webm)`
+- `MKV (.mkv)`
+- `MOV (.mov)`
 
-### Mode
+### Bitrate Mbps
 
-Chooses how the video is generated.
+Controls video quality and file size.
 
-- `Realtime Capture`: live recording
-- `Fast Export`: offline export with chosen FPS
-- `Fixed Delta`: offline export with chosen simulation step
+- Lower bitrate: smaller files, more compression
+- Higher bitrate: larger files, cleaner image
+
+Recommended starting point: `8 Mbps`
 
 ### FPS
 
-FPS means `frames per second`.
+Controls motion smoothness.
 
-- Higher FPS creates smoother motion.
-- Lower FPS creates less smooth motion but can reduce encoding load and file size.
+- `24 FPS`: cinematic
+- `30 FPS`: common general-purpose output
+- `60 FPS`: smoother motion
 
-Examples:
+### Duration Seconds
 
-- `24 FPS`: more cinematic motion
-- `30 FPS`: common general-purpose video
-- `60 FPS`: smoother motion, good for live capture
+Used in offline modes.
 
-Important:
-
-- If a video looks choppy, FPS may be too low.
-- FPS affects motion smoothness, not image sharpness.
+- Defines final output length
+- Export stops automatically at that duration
 
 ### Fixed Delta Ms
 
-Only used in `Fixed Delta` mode.
-
-This is the fixed time step used to advance the scene on every exported frame.
-
-Examples:
+Used only in `Fixed Delta`.
 
 - `16.67 ms` is about `60 FPS`
 - `33.33 ms` is about `30 FPS`
 
-If you increase the delta:
+## Audio Controls
 
-- the related FPS becomes lower
-- the scene advances in larger time steps
+Audio controls are shown only in `Realtime Capture`.
 
-If you decrease the delta:
+### Use Microphone Audio
 
-- the related FPS becomes higher
-- the scene advances in smaller time steps
+Adds microphone input to the recorded file.
 
-### Duration Seconds
+- Browser permission is required
+- Microphone is mixed together with Babylon scene audio
 
-Only used in offline modes.
+### Mic Level
 
-This is the final video length.
+Controls microphone gain in the recorded mix.
 
-- `5` means a 5-second exported clip
-- offline export stops automatically at that duration
+- `100%` is neutral level
+- Higher values boost the mic louder
+- Default is `180%`
 
-### Bitrate Mbps
+### Play Sample Sound
 
-Bitrate controls how much video data is used per second.
+Plays a short built-in Babylon scene sound.
 
-- Higher bitrate: larger file, better visual quality
-- Lower bitrate: smaller file, more compression artifacts
-
-Examples:
-
-- `4 Mbps`: smaller file, lower quality
-- `8 Mbps`: solid default
-- `12-16 Mbps`: cleaner image, larger file
-
-Important:
-
-- If a video looks blurry or blocky, bitrate may be too low.
-- Bitrate affects image quality, not motion smoothness.
+- Use it to confirm that Babylon scene audio is active in the browser
+- Use it to check that realtime recording is able to capture scene audio
+- It does not test microphone input
+- If you do not hear anything at first, click it after interacting with the page because browsers often keep audio locked until user input
 
 ## Buttons
 
@@ -137,80 +120,37 @@ Starts recording or export using the current settings.
 
 ### Pause / Resume
 
-Only meaningful in `Realtime Capture`.
-
-- `Pause` temporarily stops capture
-- `Resume` continues capture into the same recording
-
-Offline modes do not use pause/resume.
+Available in `Realtime Capture`.
 
 ### Stop
 
-Stops the current recording and finalizes the video.
-
-- In `Realtime Capture`, you stop manually.
-- In offline modes, export usually finishes on its own when duration is reached.
+Stops recording and finalizes the file.
 
 ### Preview
 
-Opens the last recorded video in the built-in preview dialog.
+Opens the last result in the built-in preview dialog.
 
 ### Download
 
-Saves the last recorded video file to disk.
-
-## Scene Audio
-
-The app includes a sample Babylon scene sound to verify that audio is working.
-
-- `Play Sample Sound` only appears in `Realtime Capture`.
-- Realtime recording can include Babylon scene audio.
-- Offline modes currently export video without audio.
-
-If you do not hear sound:
-
-- click `Play Sample Sound`
-- make sure the browser has not blocked audio until user interaction
+Saves the last result to disk.
 
 ## Diagnostics
 
 The diagnostics panel shows:
 
-- `Codec`: active video codec
-- `Frames`: captured or exported frame count
-- `Recorded`: current output duration
-- `File Size`: final file size when available
-
-## Choosing Good Settings
-
-Recommended starting points:
-
-- Realtime Capture: `60 FPS`, `8 Mbps`
-- Fast Export: `30 FPS`, `8 Mbps`, `5s`
-- Fixed Delta: `16.67 ms`, `8 Mbps`, `5s`
-
-If the file is too large:
-
-- reduce bitrate first
-- reduce FPS only if you can accept less smooth motion
-
-If the image quality is poor:
-
-- increase bitrate
-
-If motion feels too jerky:
-
-- increase FPS
+- `Codec`
+- `Frames`
+- `Recorded`
+- `File Size`
 
 ## Current Limitations
 
-- Offline modes do not record audio yet.
-- Long recordings still depend on browser memory because the final video is held before download.
-- Browser codec support varies by system and browser.
+- Offline modes do not include audio
+- Final output is buffered in browser memory before download
+- Available codecs depend on browser and system support
 
-## Summary
+## Recommended Defaults
 
-Use `Realtime Capture` for live recording with audio.
-Use `Fast Export` for quick offline rendering.
-Use `Fixed Delta` when you need a fixed simulation step.
-Use `FPS` to control smoothness and `bitrate` to control image quality.
+- Realtime Capture: `60 FPS`, `8 Mbps`
+- Fast Export: `60 FPS`, `8 Mbps`, `5s`
+- Fixed Delta: `16.67 ms`, `8 Mbps`, `5s`
