@@ -28,8 +28,18 @@ app.innerHTML = `
   <div class="shell">
     <section class="panel">
       <div class="panel-body">
-        <p class="eyebrow">DEMO: Babylon Scene to Video</p>
-        <h1>BabyRecorder</h1>
+        <div class="panel-head">
+          <div class="brand-mark" aria-hidden="true">
+            <svg viewBox="0 0 64 64" role="presentation">
+              <path d="M14 12h36a6 6 0 0 1 6 6v28a6 6 0 0 1-6 6H14a6 6 0 0 1-6-6V18a6 6 0 0 1 6-6Zm0 4a2 2 0 0 0-2 2v4h6v-6Zm10 0v6h16v-6Zm20 0v6h8v-4a2 2 0 0 0-2-2Zm8 10h-8v12h8Zm0 16h-8v6h6a2 2 0 0 0 2-2Zm-12 6v-26H24v26Zm-20 0v-6h-8v4a2 2 0 0 0 2 2Zm-8-10h8V26h-8Z" />
+              <path d="M28 28h8a2 2 0 0 1 1.6 3.2l-4 5.33a2 2 0 0 1-3.2 0l-4-5.33A2 2 0 0 1 28 28Z" />
+            </svg>
+          </div>
+          <div class="panel-head-copy">
+            <p class="eyebrow">DEMO: Babylon Scene to Video</p>
+            <h1>BabyRecorder</h1>
+          </div>
+        </div>
         <p id="lede" class="lede">
           Records the live Babylon canvas with MediaBunny and exports a video file.
         </p>
@@ -289,6 +299,13 @@ const torusMaterial = new StandardMaterial("torus-material", scene);
 torusMaterial.diffuseColor = new Color3(0.95, 0.82, 0.32);
 torus.material = torusMaterial;
 
+const sampleMeshes = {
+  ground,
+  sphere,
+  box,
+  torus,
+};
+
 const resize = () => engine.resize();
 window.addEventListener("resize", resize);
 
@@ -312,15 +329,19 @@ const createSampleToneBuffer = (audioContext: AudioContext): AudioBuffer => {
 };
 
 const applySceneState = (timeSeconds: number) => {
-  sphere.position.y = 1.4 + Math.sin(timeSeconds * 1.8) * 0.55;
-  sphere.rotation.y = timeSeconds * 1.2;
+  if (!sampleMeshes.sphere || sampleMeshes.sphere.isDisposed()) {
+    return;
+  }
 
-  box.rotation.x = timeSeconds * 0.7;
-  box.rotation.y = -timeSeconds * 1.1;
-  box.position.z = 1.2 + Math.sin(timeSeconds * 1.1) * 0.5;
+  sampleMeshes.sphere.position.y = 1.4 + Math.sin(timeSeconds * 1.8) * 0.55;
+  sampleMeshes.sphere.rotation.y = timeSeconds * 1.2;
 
-  torus.rotation.z = timeSeconds * 1.5;
-  torus.position.x = 2.1 + Math.cos(timeSeconds * 1.4) * 0.4;
+  sampleMeshes.box.position.z = 1.2 + Math.sin(timeSeconds * 1.1) * 0.5;
+  sampleMeshes.box.rotation.x = timeSeconds * 0.7;
+  sampleMeshes.box.rotation.y = -timeSeconds * 1.1;
+
+  sampleMeshes.torus.position.x = 2.1 + Math.cos(timeSeconds * 1.4) * 0.4;
+  sampleMeshes.torus.rotation.z = timeSeconds * 1.5;
 };
 
 const renderSceneAt = (timeSeconds: number) => {
@@ -371,13 +392,12 @@ const ensureSampleSound = (): Sound => {
 
   sampleSound = new Sound("sample-tone", createSampleToneBuffer(audioContext), scene, undefined, {
     loop: false,
-    spatialSound: true,
+    spatialSound: false,
     volume: 0.85,
     maxDistance: 18,
     refDistance: 2,
     rolloffFactor: 1.15,
   });
-  sampleSound.attachToMesh(sphere);
   return sampleSound;
 };
 
