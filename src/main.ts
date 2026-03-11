@@ -10,6 +10,7 @@ import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder";
 import { Scene } from "@babylonjs/core/scene";
 import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
 import "./style.css";
+import userGuideMarkdown from "../USER_GUIDE.md?raw";
 import {
   BabylonSceneRecorder,
   type OutputFormatOption,
@@ -145,8 +146,11 @@ app.innerHTML = `
         </p>
       </div>
       <footer class="panel-footer">
-        <p class="panel-footer-copy">Created by <a href="https://babylonpress.org/" target="_blank" rel="noreferrer">BabylonPress</a></p>
-        <a href="https://github.com/eldinor/babyrecorder" target="_blank" rel="noreferrer">Source</a>
+        <div class="panel-footer-links">
+          <p class="panel-footer-copy">Created by <a href="https://babylonpress.org/" target="_blank" rel="noreferrer">BabylonPress</a></p>
+          <a href="https://github.com/eldinor/babyrecorder" target="_blank" rel="noreferrer">Source</a>
+        </div>
+        <button id="show-help" class="footer-icon-button" type="button" title="Open user guide" aria-label="Open user guide">?</button>
       </footer>
     </section>
     <section class="viewport">
@@ -163,6 +167,17 @@ app.innerHTML = `
         </div>
       </div>
       <video id="preview-video" controls playsinline></video>
+    </div>
+  </dialog>
+  <dialog id="help-dialog" class="preview-dialog">
+    <div class="preview-card help-card">
+      <div class="preview-head">
+        <h2>User Guide</h2>
+        <div class="preview-actions">
+          <button id="close-help" type="button" title="Close user guide" aria-label="Close user guide">×</button>
+        </div>
+      </div>
+      <div id="help-content" class="help-content"></div>
     </div>
   </dialog>
 `;
@@ -198,6 +213,10 @@ const previewDialog = document.querySelector<HTMLDialogElement>("#preview-dialog
 const previewVideo = document.querySelector<HTMLVideoElement>("#preview-video");
 const previewDownloadButton = document.querySelector<HTMLButtonElement>("#preview-download");
 const closePreviewButton = document.querySelector<HTMLButtonElement>("#close-preview");
+const showHelpButton = document.querySelector<HTMLButtonElement>("#show-help");
+const helpDialog = document.querySelector<HTMLDialogElement>("#help-dialog");
+const helpContent = document.querySelector<HTMLElement>("#help-content");
+const closeHelpButton = document.querySelector<HTMLButtonElement>("#close-help");
 const diagCodec = document.querySelector<HTMLElement>("#diag-codec");
 const diagFrames = document.querySelector<HTMLElement>("#diag-frames");
 const diagDuration = document.querySelector<HTMLElement>("#diag-duration");
@@ -235,6 +254,10 @@ if (
   !previewVideo ||
   !previewDownloadButton ||
   !closePreviewButton ||
+  !showHelpButton ||
+  !helpDialog ||
+  !helpContent ||
+  !closeHelpButton ||
   !diagCodec ||
   !diagFrames ||
   !diagDuration ||
@@ -242,6 +265,10 @@ if (
 ) {
   throw new Error("UI bootstrap failed.");
 }
+
+previewDownloadButton.textContent = "↓";
+closePreviewButton.textContent = "×";
+closeHelpButton.textContent = "×";
 
 const renderDiagnostics = (diagnostics: RecorderDiagnostics) => {
   diagCodec.textContent = diagnostics.codec ? diagnostics.codec.toUpperCase() : "-";
@@ -257,6 +284,102 @@ renderDiagnostics({
   recordedSeconds: 0,
   fileSizeBytes: null,
 });
+
+const escapeHtml = (value: string) =>
+  value
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
+
+const formatInlineMarkdown = (value: string) => escapeHtml(value).replace(/`([^`]+)`/g, "<code>$1</code>");
+
+const renderMarkdownToHtml = (markdown: string) => {
+  const lines = markdown.replaceAll("\r\n", "\n").split("\n");
+  const html: string[] = [];
+  let inOrderedList = false;
+  let inUnorderedList = false;
+
+  const closeLists = () => {
+    if (inOrderedList) {
+      html.push("</ol>");
+      inOrderedList = false;
+    }
+
+    if (inUnorderedList) {
+      html.push("</ul>");
+      inUnorderedList = false;
+    }
+  };
+
+  for (const rawLine of lines) {
+    const line = rawLine.trim();
+
+    if (!line) {
+      closeLists();
+      continue;
+    }
+
+    if (line.startsWith("### ")) {
+      closeLists();
+      html.push(`<h4>${formatInlineMarkdown(line.slice(4))}</h4>`);
+      continue;
+    }
+
+    if (line.startsWith("## ")) {
+      closeLists();
+      html.push(`<h3>${formatInlineMarkdown(line.slice(3))}</h3>`);
+      continue;
+    }
+
+    if (line.startsWith("# ")) {
+      closeLists();
+      html.push(`<h2>${formatInlineMarkdown(line.slice(2))}</h2>`);
+      continue;
+    }
+
+    const orderedMatch = line.match(/^\d+\.\s+(.*)$/);
+    if (orderedMatch) {
+      if (inUnorderedList) {
+        html.push("</ul>");
+        inUnorderedList = false;
+      }
+
+      if (!inOrderedList) {
+        html.push("<ol>");
+        inOrderedList = true;
+      }
+
+      html.push(`<li>${formatInlineMarkdown(orderedMatch[1])}</li>`);
+      continue;
+    }
+
+    const unorderedMatch = line.match(/^- (.*)$/);
+    if (unorderedMatch) {
+      if (inOrderedList) {
+        html.push("</ol>");
+        inOrderedList = false;
+      }
+
+      if (!inUnorderedList) {
+        html.push("<ul>");
+        inUnorderedList = true;
+      }
+
+      html.push(`<li>${formatInlineMarkdown(unorderedMatch[1])}</li>`);
+      continue;
+    }
+
+    closeLists();
+    html.push(`<p>${formatInlineMarkdown(line)}</p>`);
+  }
+
+  closeLists();
+  return html.join("");
+};
+
+helpContent.innerHTML = renderMarkdownToHtml(userGuideMarkdown);
 
 const outputFormats = {
   mp4: new Mp4OutputFormat(),
@@ -403,7 +526,7 @@ const updateAudioStatus = () => {
   }
 
   const canCreateMediaStreamDestination = typeof audioContext.createMediaStreamDestination === "function";
-  const unlocked = Engine.audioEngine?.unlocked ?? false;
+  const unlocked = audioContext.state === "running";
   const lockState = unlocked ? "unlocked" : "locked until click";
   const captureState = canCreateMediaStreamDestination ? "capture-ready" : "playback-only";
   audioStatus.textContent = `Scene audio: ${captureState}, ${lockState}.`;
@@ -781,6 +904,14 @@ closePreviewButton.addEventListener("click", () => {
   previewDialog.close();
 });
 
+showHelpButton.addEventListener("click", () => {
+  helpDialog.showModal();
+});
+
+closeHelpButton.addEventListener("click", () => {
+  helpDialog.close();
+});
+
 previewDownloadButton.addEventListener("click", () => {
   try {
     recorder.downloadLastVideo();
@@ -793,6 +924,12 @@ previewDownloadButton.addEventListener("click", () => {
 previewDialog.addEventListener("click", (event) => {
   if (event.target === previewDialog) {
     previewDialog.close();
+  }
+});
+
+helpDialog.addEventListener("click", (event) => {
+  if (event.target === helpDialog) {
+    helpDialog.close();
   }
 });
 

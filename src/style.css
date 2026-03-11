@@ -409,14 +409,22 @@ h1 {
   margin-top: auto;
   padding-top: 1rem;
   border-top: 1px solid rgba(255, 255, 255, 0.08);
-  display: grid;
-  gap: 0.3rem;
+  display: flex;
+  align-items: stretch;
+  justify-content: space-between;
+  gap: 0.75rem;
 }
 
 .panel-footer-copy {
   margin: 0;
   color: rgba(246, 242, 233, 0.66);
   font-size: 0.78rem;
+}
+
+.panel-footer-links {
+  display: grid;
+  gap: 0.3rem;
+  min-width: 0;
 }
 
 .panel-footer a {
@@ -428,6 +436,27 @@ h1 {
 
 .panel-footer a:hover {
   color: #9ed8ff;
+}
+
+.footer-icon-button {
+  width: 2.2rem;
+  min-width: 2.2rem;
+  align-self: stretch;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(246, 242, 233, 0.88);
+  cursor: pointer;
+  font-size: 0.95rem;
+  font-weight: 700;
+  transition: transform 140ms ease, filter 140ms ease, border-color 140ms ease;
+}
+
+.footer-icon-button:hover {
+  transform: scale(0.94);
+  filter: brightness(1.08);
+  border-color: rgba(158, 216, 255, 0.4);
 }
 
 .viewport {
@@ -453,6 +482,10 @@ h1 {
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 24px;
   background: #08111c;
+}
+
+.help-card {
+  width: min(92vw, 860px);
 }
 
 .preview-head {
@@ -491,7 +524,8 @@ h1 {
   background: linear-gradient(135deg, #1d4f9c, #102c5f);
 }
 
-#close-preview {
+#close-preview,
+#close-help {
   background: linear-gradient(135deg, #163e7d, #0b1f45);
 }
 
@@ -507,6 +541,88 @@ h1 {
   border-radius: 16px;
   background: #000;
   object-fit: contain;
+}
+
+.help-content {
+  max-height: calc(88vh - 5.5rem);
+  overflow: auto;
+  padding: 0.25rem 0.2rem 0.25rem 0;
+  color: rgba(246, 242, 233, 0.88);
+  line-height: 1.55;
+  scrollbar-color: rgba(127, 208, 255, 0.75) rgba(16, 36, 58, 0.9);
+  scrollbar-width: thin;
+}
+
+.help-content::-webkit-scrollbar {
+  width: 0.8rem;
+}
+
+.help-content::-webkit-scrollbar-track {
+  background: rgba(16, 36, 58, 0.9);
+  border-radius: 999px;
+}
+
+.help-content::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, rgba(143, 225, 255, 0.95), rgba(29, 79, 156, 0.95));
+  border: 2px solid rgba(16, 36, 58, 0.95);
+  border-radius: 999px;
+}
+
+.help-content::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, rgba(170, 234, 255, 0.98), rgba(40, 105, 194, 0.98));
+}
+
+.help-content h2,
+.help-content h3,
+.help-content h4 {
+  margin: 1.1rem 0 0.45rem;
+  color: #9ed8ff;
+}
+
+.help-content h2:first-child,
+.help-content h3:first-child,
+.help-content h4:first-child {
+  margin-top: 0;
+}
+
+.help-content h2 {
+  font-size: 1.15rem;
+}
+
+.help-content h3 {
+  font-size: 0.98rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.help-content h4 {
+  font-size: 0.9rem;
+  color: #c9e9ff;
+}
+
+.help-content p,
+.help-content ol,
+.help-content ul {
+  margin: 0 0 0.7rem;
+  font-size: 0.9rem;
+}
+
+.help-content ol,
+.help-content ul {
+  padding-left: 1.25rem;
+  color: rgba(246, 242, 233, 0.82);
+}
+
+.help-content li + li {
+  margin-top: 0.28rem;
+}
+
+.help-content code {
+  padding: 0.1rem 0.38rem;
+  border-radius: 999px;
+  background: rgba(143, 215, 255, 0.12);
+  color: #b7e7ff;
+  font-size: 0.84em;
 }
 
 #render-canvas {
@@ -526,6 +642,14 @@ h1 {
   .panel {
     border-right: 0;
     border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  }
+
+  .panel-footer {
+    align-items: flex-start;
+  }
+
+  .footer-icon-button {
+    min-height: 2.2rem;
   }
 
   .controls {
