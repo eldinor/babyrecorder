@@ -32,8 +32,8 @@ app.innerHTML = `
         <div class="panel-head">
           <div class="brand-mark" aria-hidden="true">
             <svg viewBox="0 0 64 64" role="presentation">
-              <path d="M14 12h36a6 6 0 0 1 6 6v28a6 6 0 0 1-6 6H14a6 6 0 0 1-6-6V18a6 6 0 0 1 6-6Zm0 4a2 2 0 0 0-2 2v4h6v-6Zm10 0v6h16v-6Zm20 0v6h8v-4a2 2 0 0 0-2-2Zm8 10h-8v12h8Zm0 16h-8v6h6a2 2 0 0 0 2-2Zm-12 6v-26H24v26Zm-20 0v-6h-8v4a2 2 0 0 0 2 2Zm-8-10h8V26h-8Z" />
-              <path d="M28 28h8a2 2 0 0 1 1.6 3.2l-4 5.33a2 2 0 0 1-3.2 0l-4-5.33A2 2 0 0 1 28 28Z" />
+              <path d="M14 12h36a6 6 0 0 1 6 6v28a6 6 0 0 1-6 6H14a6 6 0 0 1-6-6V18a6 6 0 0 1 6-6Zm0 4a2 2 0 0 0-2 2v4h6v-6Zm8 0v6h20v-6Zm22 0v6h8v-4a2 2 0 0 0-2-2Zm8 10h-8v12h8Zm0 16h-8v6h6a2 2 0 0 0 2-2Zm-10 6v-26H22v26Zm-22 0v-6h-8v4a2 2 0 0 0 2 2Zm-8-10h8V26h-8Z" />
+              <path d="M32 26.5 39 30v8l-7 3.5-7-3.5v-8Zm-5 4.62 5 2.5 5-2.5-5-2.5Zm-1 2.24v3.4l5 2.5v-3.4Zm12 0-5 2.5v3.4l5-2.5Z" />
             </svg>
           </div>
           <div class="panel-head-copy">
